@@ -1,4 +1,4 @@
-# Tasmota — Comandos de configuração via console
+# Tasmota 15.3.0.4 — Comandos de configuração via console
 # Cole cada bloco no console web: http://<ip-do-dispositivo>/cs
 # Use "Backlog" para executar múltiplos comandos em sequência.
 #
@@ -14,36 +14,45 @@ Backlog Hostname co2-sensor; FriendlyName CO2 Sensor; Topic co2sensor
 # Backlog MqttHost <ip-do-broker>; MqttPort 1883; MqttUser <usuario>; MqttPassword <senha>
 
 # ─── 4. Template de GPIOs ───────────────────────────────────────────────────
-# Cole o conteúdo de tasmota_template.json no campo "Other → Template" da interface web,
-# ou execute via console:
-Template {"NAME":"CO2-Sensor-ESP32","GPIO":[1,1,1,1,1,736,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,640,608,704,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"FLAG":0,"BASE":1}
+# Cole o conteúdo de tasmota_template.json no campo "Configuration → Configure Other → Template",
+# marque "Activate" e salve. Ou execute via console:
+Template {"NAME":"CO2-Sensor-ESP32","GPIO":[1,1,1,1,1,6720,1,1,1,1,1,1,1,1,1,1,1,1,736,672,1,640,608,704,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"FLAG":0,"BASE":1}
 Module 0
 
-# ─── 5. Display SSD1306 ─────────────────────────────────────────────────────
-Backlog DisplayModel 2; DisplayType 0; DisplayWidth 128; DisplayHeight 64; DisplayAddress 60; DisplayDimmer 80; DisplayMode 0
+# Mapeamento:
+#   GPIO 5  = 6720 → SD Card CS
+#   GPIO 18 = 736  → SPI CLK
+#   GPIO 19 = 672  → SPI MISO
+#   GPIO 21 = 640  → I2C SDA  (SCD41, SSD1306, DS3231)
+#   GPIO 22 = 608  → I2C SCL  (SCD41, SSD1306, DS3231)
+#   GPIO 23 = 704  → SPI MOSI
 
-# ─── 6. Drivers I2C ─────────────────────────────────────────────────────────
-# Habilita SCD40/SCD41 (driver 44) e DS3231 RTC (driver 56)
+# ─── 5. Drivers I2C ─────────────────────────────────────────────────────────
+# Habilita SCD41 (driver 44) e DS3231 RTC (driver 56)
+# NÃO configure DisplayModel — o SSD1306 é controlado diretamente pelo script Berry
 Backlog I2CDriver44 1; I2CDriver56 1
 
-# ─── 7. Telemetria ──────────────────────────────────────────────────────────
+# ─── 6. Telemetria ──────────────────────────────────────────────────────────
 # Publica leituras MQTT a cada 60 segundos
 Backlog TelePeriod 60; SetOption8 0; SetOption19 0
 
-# ─── 8. Fuso horário (UTC-3 = Brasília) ─────────────────────────────────────
+# ─── 7. Fuso horário (UTC-3 = Brasília) ─────────────────────────────────────
+# Necessário para que sync_rtc() grave a hora correta no DS3231
 Backlog Timezone -3; TimeDST 0,0,0,0,0,-2; TimeSTD 0,0,0,0,0,-3
 
-# ─── 9. Verificação ─────────────────────────────────────────────────────────
+# ─── 8. Verificação ─────────────────────────────────────────────────────────
 # Execute após reiniciar para confirmar que os sensores foram detectados:
-#   I2CScan          → lista dispositivos I2C encontrados
-#   Status 8         → mostra dados dos sensores
+#   I2CScan          → lista dispositivos I2C (0x3C, 0x62, 0x68 esperados)
+#   Status 8         → mostra dados dos sensores (chave SCD41)
 #   SDInfo           → mostra informações do cartão SD
 
 # ─── Sequência de configuração recomendada ──────────────────────────────────
-# 1. Template + Module 0                → aplica mapeamento de GPIOs → reinicia
-# 2. DisplayModel + I2CDriver           → configura display e drivers
-# 3. TelePeriod + Timezone              → ajusta telemetria e hora
+# 1. Template + Module 0            → aplica mapeamento de GPIOs → reinicia
+# 2. I2CDriver44 + I2CDriver56      → habilita drivers SCD41 e DS3231
+# 3. TelePeriod + Timezone          → ajusta telemetria e fuso horário
 # 4. Reiniciar: Restart 1
 # 5. Conferir com I2CScan e Status 8
-# 6. Fazer upload do autoexec.be via File Manager
-# 7. Reiniciar: Restart 1
+# 6. Inserir cartão SD formatado FAT32; conferir com SDInfo
+# 7. Fazer upload de firmware/autoexec.be via Tools → Manage File System
+# 8. Reiniciar: Restart 1
+# 9. Display acende ~21 s após o boot

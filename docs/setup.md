@@ -3,7 +3,7 @@
 ## Pré-requisitos
 
 - Python 3.8+ (para esptool)
-- Tasmota `tasmota32.bin` v14.0 ou superior — [download](https://github.com/arendst/Tasmota/releases)
+- Tasmota `tasmota32.bin` v15.3.0.4 ou superior — [download](https://github.com/arendst/Tasmota/releases)
 - Cartão MicroSD FAT32, até 32 GB
 - Módulo ESP32 conectado via USB
 
@@ -54,28 +54,27 @@ Acesse [https://tasmota.github.io/install/](https://tasmota.github.io/install/) 
 
 ### Mapeamento do template
 
-| GPIO | Função Tasmota | Periférico |
+| GPIO | Código Tasmota | Periférico |
 |---|---|---|
-| GPIO 21 | I2C SDA | SCD41, SSD1306, DS3231 |
-| GPIO 22 | I2C SCL | SCD41, SSD1306, DS3231 |
-| GPIO 23 | SPI MOSI | SD Card |
-| GPIO 19 | SPI MISO | SD Card |
-| GPIO 18 | SPI CLK | SD Card |
-| GPIO 5 | SD Card CS | SD Card |
+| GPIO 5  | 6720 — SD Card CS | SD Card |
+| GPIO 18 | 736 — SPI CLK    | SD Card |
+| GPIO 19 | 672 — SPI MISO   | SD Card |
+| GPIO 21 | 640 — I2C SDA    | SCD41, SSD1306, DS3231 |
+| GPIO 22 | 608 — I2C SCL    | SCD41, SSD1306, DS3231 |
+| GPIO 23 | 704 — SPI MOSI   | SD Card |
 
-## 4. Configurar drivers e display via console
+> O script Berry também aplica esses GPIOs via `setup_gpio()` no boot, mas o template garante o mapeamento correto desde o primeiro reinício.
+
+## 4. Configurar drivers via console
 
 Acesse **Tools → Console** na interface web e execute:
 
 ```
-# Drivers I2C: SCD40/SCD41 (44) e DS3231 (56)
+# Drivers I2C: SCD41 (44) e DS3231 (56)
 Backlog I2CDriver44 1; I2CDriver56 1
 
-# Display SSD1306 128x64 no endereço 0x3C (decimal 60)
-Backlog DisplayModel 2; DisplayWidth 128; DisplayHeight 64; DisplayAddress 60; DisplayMode 0
-
-# Fuso horário UTC-3 (Brasília)
-Backlog Timezone -3
+# Fuso horário UTC-3 (Brasília) para NTP
+Backlog Timezone -3; TimeDST 0,0,0,0,0,-2; TimeSTD 0,0,0,0,0,-3
 
 # Telemetria MQTT a cada 60 segundos
 TelePeriod 60
@@ -83,6 +82,8 @@ TelePeriod 60
 # Reiniciar
 Restart 1
 ```
+
+> O display SSD1306 é controlado diretamente pelo script Berry via `wire1` — **não** configure `DisplayModel` nem `DisplayMode`. O subsistema de Display do Tasmota não é utilizado.
 
 ## 5. Verificar detecção dos sensores
 
@@ -103,7 +104,7 @@ I2C Device found at address 0x68  (DS3231)
 Status 8
 ```
 
-Deve retornar JSON com campos `SCD40.CarbonDioxide`, `SCD40.Temperature`, `SCD40.Humidity`.
+Deve retornar JSON com campos `SCD41.CarbonDioxide`, `SCD41.Temperature`, `SCD41.Humidity`.
 
 ## 6. Preparar o cartão SD
 
@@ -123,7 +124,7 @@ Saída esperada:
 ## 7. Carregar o script Berry
 
 1. Na interface web, vá em **Tools → Manage File System**.
-2. Clique em **Choose File** e selecione `firmware/berry/autoexec.be`.
+2. Clique em **Choose File** e selecione `firmware/autoexec.be`.
 3. Clique em **Upload**.
 4. Reinicie o dispositivo:
 
@@ -131,28 +132,42 @@ Saída esperada:
 Restart 1
 ```
 
-O display deve acender em ~3 segundos após o boot e exibir as leituras em ~8 segundos (tempo de aquecimento do SCD41 na primeira medição).
+O script aguarda **20 s** após o boot antes de inicializar (tempo de estabilização do Tasmota e do Wi-Fi). O display acende ~1 s depois, exibindo as primeiras leituras em ~21 s no total.
 
-## 8. Acerto do RTC DS3231
+## 8. Sincronização do DS3231
 
-O Tasmota sincroniza o DS3231 automaticamente via NTP quando há conexão com a internet. Para definir a hora manualmente (sem internet):
+O script sincroniza o DS3231 automaticamente via NTP (usando `tasmota.rtc()`) no boot, desde que haja conexão com a internet. O RTC mantém o horário mesmo sem energia no ESP32 (bateria CR2032).
+
+Para definir a hora manualmente (sem internet):
 
 ```
-Time 2025-01-15T14:30:00
+Time 2025-04-28T14:30:00
+Restart 1
 ```
 
-O DS3231 mantém o horário mesmo sem energia no ESP32 (bateria CR2032).
+O script usa o horário do Tasmota (UTC-3) para sincronizar o DS3231 na próxima reinicialização.
+
+## 9. Calibração do SCD41
+
+Para calibração forçada com ar externo (~420 ppm CO₂):
+
+```
+Br calibrar_scd41(420)
+```
+
+A função para a medição, aguarda 3 s, aplica FRC (Forced Recalibration) e imprime confirmação no console. Execute em ambiente externo ventilado com o sensor estabilizado por pelo menos 3 minutos.
 
 ## Solução de problemas
 
 | Sintoma | Causa provável | Solução |
 |---|---|---|
-| Display não liga | GPIO errado ou display sem alimentação | Verificar pinagem e `I2CScan` |
+| Display não liga após 21 s | GPIO errado ou endereço I2C | Verificar pinagem e `I2CScan` |
 | SCD41 não detectado | Endereço I2C errado ou pull-ups faltando | Verificar 4,7 kΩ no SDA/SCL |
-| SD não montado | Formato incorreto ou CS errado | Formatar FAT32; conferir GPIO5 |
-| `Status 8` sem SCD40 | Driver I2CDriver44 não habilitado | `I2CDriver44 1` + `Restart 1` |
-| Hora incorreta | DS3231 sem bateria ou fuso errado | Verificar CR2032; `Timezone -3` |
+| SD não montado | Formato incorreto ou CS errado | Formatar FAT32; confirmar GPIO5=6720 no template |
+| `Status 8` sem SCD41 | Driver I2CDriver44 não habilitado | `I2CDriver44 1` + `Restart 1` |
+| Hora incorreta no display | DS3231 sem bateria ou NTP indisponível | Verificar CR2032; usar `Time` manual + `Restart 1` |
 | Log não criado | SD não montado no momento do boot | Reiniciar após confirmar `SDInfo` |
+| ESP32 reinicia sozinho | Watchdog ativo (loop travado) | Verificar console para mensagem `ALERTA: loop travado!` |
 
 ## Compilação customizada (opcional)
 
@@ -160,12 +175,12 @@ Se preferir compilar o Tasmota com os drivers incluídos estaticamente:
 
 ```c
 // user_config_override.h
-#define USE_SCD40         // SCD41 sensor
+#define USE_SCD40         // SCD41 sensor (driver cobre ambos os modelos)
 #define USE_DS3231        // RTC DS3231
-#define USE_DISPLAY       // subsistema de display
-#define USE_DISPLAY_SSD1306
 #define USE_BERRY         // scripting Berry
 #define USE_SDCARD        // suporte SD card
 ```
+
+> `USE_DISPLAY` e `USE_DISPLAY_SSD1306` **não são necessários** — o script controla o SSD1306 diretamente via I2C.
 
 Use PlatformIO com o `platformio.ini` do repositório Tasmota.

@@ -1,13 +1,15 @@
 # CO2 Sensor — ESP32 + Tasmota
 
-Monitor de qualidade do ar com ESP32, sensor SCD41, display OLED, RTC e log em cartão SD. O firmware é o Tasmota com script Berry (`autoexec.be`) que controla o display, sincroniza o tempo via DS3231 e grava logs CSV no cartão SD.
+Monitor de qualidade do ar com ESP32, sensor SCD41, display OLED, RTC e log em cartão SD. O firmware é o Tasmota 15.3.0.4 com script Berry (`autoexec.be`) que controla o display SSD1306 diretamente via I2C, sincroniza o DS3231 via NTP no boot e grava logs CSV no cartão SD.
 
 ## Funcionalidades
 
 - Leitura de CO2 (ppm), temperatura (°C) e umidade relativa (%) via SCD41
-- Display OLED SSD1306 128×64 com indicador de qualidade do ar em português
-- Relógio em tempo real DS3231 — sem depender de NTP na rede local
-- Log CSV no cartão SD com timestamp ISO 8601, gravado a cada 60 s
+- Display OLED SSD1306 128×64 com driver próprio em Berry (fonte 5×7, sem subsistema Display do Tasmota)
+- Relógio em tempo real DS3231 — lido diretamente via I2C, sincronizado por NTP a cada boot
+- Log CSV no cartão SD com timestamp local, gravado a cada 10 s; nome de arquivo gerado pela data/hora do boot
+- Watchdog de software: reinicia o ESP32 se o loop principal travar por mais de 60 s
+- Calibração forçada do SCD41 via função Berry `calibrar_scd41(ppm)` acessível pelo console
 - Telemetria MQTT e painel web via Tasmota (opcional)
 - Sem código C/C++ customizado — só Berry script + configuração Tasmota
 
@@ -35,8 +37,7 @@ co2-sensor-tasmota/
 │   ├── wiring.md       # Diagrama de conexões e pinagem
 │   └── setup.md        # Guia completo de configuração
 ├── firmware/
-│   ├── berry/
-│   │   └── autoexec.be # Script Berry principal
+│   ├── autoexec.be     # Script Berry principal (carregar no Tasmota)
 │   └── tasmota/
 │       ├── tasmota_template.json  # Template de GPIOs para Tasmota
 │       └── backlog_config.txt     # Comandos de configuração via console
@@ -48,33 +49,56 @@ co2-sensor-tasmota/
 
 1. **Grave o firmware Tasmota** no ESP32 — veja [`docs/setup.md`](docs/setup.md).
 2. **Conecte os componentes** conforme [`hardware/pinout.md`](hardware/pinout.md).
-3. **Configure os GPIOs** via console Tasmota com os comandos em [`firmware/tasmota/backlog_config.txt`](firmware/tasmota/backlog_config.txt).
-4. **Carregue o script Berry** copiando [`firmware/berry/autoexec.be`](firmware/berry/autoexec.be) via Tasmota File Manager (interface web → `Consola → Gerenciador de Arquivos`).
-5. **Reinicie** o dispositivo. O display deve exibir as leituras em ~10 s.
+3. **Configure os GPIOs e drivers** via console Tasmota com os comandos em [`firmware/tasmota/backlog_config.txt`](firmware/tasmota/backlog_config.txt).
+4. **Carregue o script Berry** copiando [`firmware/autoexec.be`](firmware/autoexec.be) via Tasmota File Manager (`Tools → Manage File System`).
+5. **Reinicie** o dispositivo. O display acende ~21 s após o boot.
 
-## Qualidade do ar — classificação
+## Layout do display
 
-| CO₂ (ppm) | Classificação |
-|---|---|
-| < 600 | Excelente |
-| 600–799 | Bom |
-| 800–999 | Moderado |
-| 1000–1499 | Ruim |
-| ≥ 1500 | Perigoso |
+```
+28/04/2025        ← data (DS3231)
+14:30             ← hora (DS3231)
+
+CO2:512 ppm       ← leitura SCD41
+
+T:22.5C H:45%     ← temperatura e umidade
+
+192.168.1.42      ← IP Wi-Fi
+```
+
+Linha em branco entre grupos = página vazia no SSD1306 (fonte 5×7, 6 px por coluna).
 
 ## Log CSV
 
-O arquivo `/sd/co2_log.csv` é criado automaticamente no cartão SD:
+O arquivo é criado no cartão SD com nome baseado na data e hora do boot:
+
+```
+/sd/co2_20250428_1430.csv
+```
+
+Cabeçalho e formato:
 
 ```csv
-datetime,co2_ppm,temperature_c,humidity_pct
-2025-01-15T14:30:00,512,22.50,45.00
-2025-01-15T14:31:00,518,22.48,44.90
+datetime,co2,temperature,humidity
+28/04/2025 14:30:00,512,22.5,45
+28/04/2025 14:30:10,515,22.5,45
 ```
+
+Gravação a cada **10 segundos**. Cada reinicialização cria um novo arquivo.
+
+## Calibração do SCD41
+
+Para calibração forçada pelo ar exterior (~420 ppm), execute no console Tasmota:
+
+```
+Br calibrar_scd41(420)
+```
+
+A função interrompe a medição, aguarda 3 s, aplica a calibração forçada (Forced Recalibration — FRC) e retoma automaticamente.
 
 ## Dependências de firmware
 
-- [Tasmota v14+](https://github.com/arendst/Tasmota) — build `tasmota32.bin` ou compilação customizada com os drivers listados em `docs/setup.md`
+- [Tasmota 15.3.0.4](https://github.com/arendst/Tasmota) — build `tasmota32.bin`
 - Nenhuma biblioteca externa — tudo incluso no Tasmota
 
 ## Licença
