@@ -76,9 +76,6 @@ Backlog I2CDriver44 1; I2CDriver56 1
 # Fuso horário UTC-3 (Brasília) para NTP
 Backlog Timezone -3; TimeDST 0,0,0,0,0,-2; TimeSTD 0,0,0,0,0,-3
 
-# Telemetria MQTT a cada 60 segundos
-TelePeriod 60
-
 # Reiniciar
 Restart 1
 ```

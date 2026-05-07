@@ -10,8 +10,11 @@ Monitor de qualidade do ar com ESP32, sensor SCD41, display OLED, RTC e log em c
 - Log CSV no cartão SD com timestamp local, gravado a cada 10 s; nome de arquivo gerado pela data/hora do boot
 - Watchdog de software: reinicia o ESP32 se o loop principal travar por mais de 60 s
 - Calibração forçada do SCD41 via função Berry `calibrar_scd41(ppm)` acessível pelo console
-- Telemetria MQTT e painel web via Tasmota (opcional)
 - Sem código C/C++ customizado — só Berry script + configuração Tasmota
+
+## Implementações futuras
+
+- Telemetria MQTT (publicação de leituras via broker MQTT usando o subsistema nativo do Tasmota)
 
 ## Hardware
 

@@ -32,9 +32,8 @@ Module 0
 # NÃO configure DisplayModel — o SSD1306 é controlado diretamente pelo script Berry
 Backlog I2CDriver44 1; I2CDriver56 1
 
-# ─── 6. Telemetria ──────────────────────────────────────────────────────────
-# Publica leituras MQTT a cada 60 segundos
-Backlog TelePeriod 60; SetOption8 0; SetOption19 0
+# ─── 6. Telemetria MQTT (implementação futura) ──────────────────────────────
+# Backlog TelePeriod 60; SetOption8 0; SetOption19 0
 
 # ─── 7. Fuso horário (UTC-3 = Brasília) ─────────────────────────────────────
 # Necessário para que sync_rtc() grave a hora correta no DS3231
