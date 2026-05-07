@@ -2,23 +2,17 @@
 
 ## Pré-requisitos
 
-- Python 3.8+ (para esptool)
-- Tasmota `tasmota32.bin` v15.3.0.4 ou superior — [download](https://github.com/arendst/Tasmota/releases)
+- Python 3.8+ (para esptool, se for gravar via serial)
 - Cartão MicroSD FAT32, até 32 GB
-- Módulo ESP32 conectado via USB
+- Módulo ESP32 conectado via USB (para flash inicial)
 
 ## 1. Instalar o firmware Tasmota no ESP32
 
-### Opção A — tasmota-install (recomendado)
+Este projeto fornece um firmware pré-compilado em `firmware/tasmota32-custom.zip` com todos os drivers necessários (SCD41, DS3231, SD Card, Berry). Extraia o `.bin` antes de gravar.
 
-```bash
-pip install tasmota-install
-tasmota-install
-```
+> Se já tiver um Tasmota qualquer rodando no ESP32, use a **Opção D (OTA)** — mais prática.
 
-Selecione a porta serial e o firmware `tasmota32.bin`.
-
-### Opção B — esptool manual
+### Opção A — esptool manual (recomendado para flash inicial)
 
 ```bash
 pip install esptool
@@ -28,14 +22,32 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 erase_flash
 
 # Grava o firmware (offset 0x0 para binários Tasmota ESP32)
 esptool.py --chip esp32 --port /dev/ttyUSB0 \
-  --baud 921600 write_flash -z 0x0 tasmota32.bin
+  --baud 921600 write_flash -z 0x0 tasmota32-custom.bin
 ```
 
 No Windows, substitua `/dev/ttyUSB0` por `COM3` (ou a porta correta).
 
+### Opção B — tasmota-install
+
+```bash
+pip install tasmota-install
+tasmota-install
+```
+
+Selecione a porta serial e aponte para o `tasmota32-custom.bin` extraído do zip.
+
 ### Opção C — Tasmota Web Installer
 
-Acesse [https://tasmota.github.io/install/](https://tasmota.github.io/install/) via Chrome/Edge e grave diretamente pelo browser.
+Acesse [https://tasmota.github.io/install/](https://tasmota.github.io/install/) via Chrome/Edge, conecte o ESP32 via USB e selecione o arquivo `tasmota32-custom.bin`.
+
+### Opção D — Atualização OTA (para dispositivos já com Tasmota)
+
+1. Na interface web do dispositivo, vá em **Firmware Upgrade → Upgrade by file upload**.
+2. Selecione o arquivo `tasmota32-custom.bin` extraído do zip.
+3. Clique em **Start upgrade**.
+4. O dispositivo reinicia automaticamente com o novo firmware.
+
+> Não é necessário apagar a flash no upgrade OTA — as configurações de Wi-Fi e GPIOs são preservadas.
 
 ## 2. Configuração inicial do Wi-Fi
 
@@ -166,9 +178,9 @@ A função para a medição, aguarda 3 s, aplica FRC (Forced Recalibration) e im
 | Log não criado | SD não montado no momento do boot | Reiniciar após confirmar `SDInfo` |
 | ESP32 reinicia sozinho | Watchdog ativo (loop travado) | Verificar console para mensagem `ALERTA: loop travado!` |
 
-## Compilação customizada (opcional)
+## Recompilação customizada (opcional)
 
-Se preferir compilar o Tasmota com os drivers incluídos estaticamente:
+O firmware em `firmware/tasmota32-custom.zip` já foi compilado com as flags abaixo. Recompile apenas se precisar alterar drivers ou versão do Tasmota.
 
 ```c
 // user_config_override.h
