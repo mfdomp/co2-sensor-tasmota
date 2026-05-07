@@ -1,0 +1,49 @@
+# Tasmota — Comandos de configuração via console
+# Cole cada bloco no console web: http://<ip-do-dispositivo>/cs
+# Use "Backlog" para executar múltiplos comandos em sequência.
+#
+# AVISO: substitua os valores entre <> pelas suas configurações reais.
+
+# ─── 1. Identidade do dispositivo ───────────────────────────────────────────
+Backlog Hostname co2-sensor; FriendlyName CO2 Sensor; Topic co2sensor
+
+# ─── 2. Wi-Fi (se não configurado pelo processo de setup inicial) ────────────
+# Backlog SSID1 <sua-rede-wifi>; Password1 <sua-senha-wifi>
+
+# ─── 3. MQTT (opcional — remover se não usar broker MQTT) ───────────────────
+# Backlog MqttHost <ip-do-broker>; MqttPort 1883; MqttUser <usuario>; MqttPassword <senha>
+
+# ─── 4. Template de GPIOs ───────────────────────────────────────────────────
+# Cole o conteúdo de tasmota_template.json no campo "Other → Template" da interface web,
+# ou execute via console:
+Template {"NAME":"CO2-Sensor-ESP32","GPIO":[1,1,1,1,1,736,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,640,608,704,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"FLAG":0,"BASE":1}
+Module 0
+
+# ─── 5. Display SSD1306 ─────────────────────────────────────────────────────
+Backlog DisplayModel 2; DisplayType 0; DisplayWidth 128; DisplayHeight 64; DisplayAddress 60; DisplayDimmer 80; DisplayMode 0
+
+# ─── 6. Drivers I2C ─────────────────────────────────────────────────────────
+# Habilita SCD40/SCD41 (driver 44) e DS3231 RTC (driver 56)
+Backlog I2CDriver44 1; I2CDriver56 1
+
+# ─── 7. Telemetria ──────────────────────────────────────────────────────────
+# Publica leituras MQTT a cada 60 segundos
+Backlog TelePeriod 60; SetOption8 0; SetOption19 0
+
+# ─── 8. Fuso horário (UTC-3 = Brasília) ─────────────────────────────────────
+Backlog Timezone -3; TimeDST 0,0,0,0,0,-2; TimeSTD 0,0,0,0,0,-3
+
+# ─── 9. Verificação ─────────────────────────────────────────────────────────
+# Execute após reiniciar para confirmar que os sensores foram detectados:
+#   I2CScan          → lista dispositivos I2C encontrados
+#   Status 8         → mostra dados dos sensores
+#   SDInfo           → mostra informações do cartão SD
+
+# ─── Sequência de configuração recomendada ──────────────────────────────────
+# 1. Template + Module 0                → aplica mapeamento de GPIOs → reinicia
+# 2. DisplayModel + I2CDriver           → configura display e drivers
+# 3. TelePeriod + Timezone              → ajusta telemetria e hora
+# 4. Reiniciar: Restart 1
+# 5. Conferir com I2CScan e Status 8
+# 6. Fazer upload do autoexec.be via File Manager
+# 7. Reiniciar: Restart 1
