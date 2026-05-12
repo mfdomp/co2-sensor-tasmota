@@ -12,6 +12,7 @@ var LOG_INTERVAL = 10   # Intervalo de gravação no SDCard em segundos
 var log_counter  = 0
 var loop_count   = 0
 var last_count   = 0
+var SD_OK        = true
 
 import json
 
@@ -207,10 +208,11 @@ def check_sdcard()
     var f = open('/sd/.check', 'w')
     f.close()
     tasmota.cmd('DEL /sd/.check')
+    SD_OK = true
     return true
   except .. as e, m
     print('SDCard ausente: ' + str(e))
-    ssd_print_fixed('Insira o SDCard!', 0, 3, 16)
+    SD_OK = false
     return false
   end
 end
@@ -260,7 +262,8 @@ def setup_identity()
     return
   end
   tasmota.cmd('Hostname ' + nome)
-  print('Identidade configurada: ' + nome)
+  print('Identidade configurada: ' + nome + ' - reiniciando...')
+  tasmota.cmd('Restart 1')
 end
 
 # ── Display update ────────────────────────────────
@@ -291,6 +294,7 @@ def update_display()
     ssd_print_fixed('Acerte o RTC!', 0, 0, 13)
     ssd_print_fixed('--/--/----', 0, 1, 10)
   end
+  if !SD_OK  ssd_print_fixed('SD ausente!  ', 0, 2, 13)  end
   ssd_print_fixed('CO2:' + co2 + ' ppm', 0, 3, 15)
   ssd_print_fixed('T:' + temp + 'C H:' + humi + '%', 0, 5, 16)
   ssd_print_fixed(ip, 0, 7, 16)
