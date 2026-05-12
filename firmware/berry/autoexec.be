@@ -1,7 +1,8 @@
 #- ================================================
    CO2 Sensor - autoexec.be
    Hardware: ESP32-D0WD-V3 + SCD41 + SSD1306 + DS3231 + SDCard
-   Firmware: Tasmota 15.3.0.4
+   Firmware: Tasmota 15.3.0.4 (custom build com USE_ALWAYS_AP)
+   Repositório: https://github.com/mfdomp/co2-sensor-tasmota
    ================================================ -#
 
 # ── Configurações ─────────────────────────────────
@@ -116,11 +117,17 @@ def read_rtc()
 end
 
 def sync_rtc()
+  # Só sincroniza se NTP estiver disponível (utc > ano 2001)
   var now = tasmota.rtc()
-  var ts  = now['utc'] - 10800   # UTC-3
-  var sec = ts % 60   ts = ts / 60
-  var min = ts % 60   ts = ts / 60
-  var hour= ts % 24   ts = ts / 24
+  var utc = now['utc']
+  if utc < 1000000000
+    print('NTP nao sincronizado, RTC preservado')
+    return
+  end
+  var ts   = utc - 10800   # UTC-3
+  var sec  = ts % 60   ts = ts / 60
+  var min  = ts % 60   ts = ts / 60
+  var hour = ts % 24   ts = ts / 24
   ts = ts + 719468
   var era = ts / 146097
   var doe = ts - era * 146097
@@ -143,6 +150,7 @@ def sync_rtc()
 end
 
 # ── Calibração SCD41 ──────────────────────────────
+# Uso: calibrar_scd41(900)  # valor em ppm do ambiente de referência
 
 def calibrar_scd41(ppm)
   wire1.write(0x62, 0x36, 0x03, 1)
@@ -195,15 +203,51 @@ def log_sd(co2, temp, humi, t)
 end
 
 # ── Configuração de GPIOs ─────────────────────────
+# Roda apenas uma vez — detecta se já está configurado
 
 def setup_gpio()
-  tasmota.cmd('GPIO 21 640')   # I2C SDA
-  tasmota.cmd('GPIO 22 608')   # I2C SCL
-  tasmota.cmd('GPIO 18 736')   # SPI CLK
-  tasmota.cmd('GPIO 19 672')   # SPI MISO
-  tasmota.cmd('GPIO 23 704')   # SPI MOSI
-  tasmota.cmd('GPIO 5 6720')   # SDCard CS
-  print('GPIOs configurados')
+  try
+    var r = tasmota.cmd('GPIO21')
+    if r != nil
+      var cur = r.find('GPIO21')
+      if cur == 640  return  end
+      if type(cur) == 'string' && cur.find('I2C SDA1') != nil  return  end
+    end
+  except .. as e, m
+    print('GPIO check: ' + str(e))
+  end
+  tasmota.cmd('GPIO21 640')   # I2C SDA1
+  tasmota.cmd('GPIO22 608')   # I2C SCL1
+  tasmota.cmd('GPIO18 736')   # SPI CLK
+  tasmota.cmd('GPIO19 672')   # SPI MISO
+  tasmota.cmd('GPIO23 704')   # SPI MOSI
+  tasmota.cmd('GPIO5 6720')   # SDCard CS
+  print('GPIOs configurados - reiniciando...')
+  tasmota.cmd('Restart 1')
+end
+
+# ── Identidade do dispositivo ─────────────────────
+# Nome: Sensor-XXXXXX (6 últimos dígitos do MAC)
+
+def setup_identity()
+  var wf  = tasmota.wifi()
+  var mac = wf.find('mac', '')
+  if size(mac) < 12
+    print('MAC nao disponivel ainda')
+    return
+  end
+  var clean = ''
+  for i: 0..size(mac)-1
+    if mac[i] != ':'  clean += mac[i]  end
+  end
+  var nome = 'Sensor-' + clean[6..11]
+  var cur  = tasmota.cmd('Hostname')
+  if cur['Hostname'] == nome
+    print('Identidade ok: ' + nome)
+    return
+  end
+  tasmota.cmd('Hostname ' + nome)
+  print('Identidade configurada: ' + nome)
 end
 
 # ── Display update ────────────────────────────────
@@ -220,13 +264,20 @@ def update_display()
   var temp = format('%.1f', scd.find('Temperature', 0.0))
   var humi = str(int(scd.find('Humidity', 0)))
   var t    = read_rtc()
-  var ip   = tasmota.wifi()['ip']
+  var wf   = tasmota.wifi()
+  var ip   = wf.find('ip', '192.168.4.1')
   log_counter += 10
   var should_log = (log_counter >= LOG_INTERVAL)
   if should_log  log_counter = 0  end
-  ssd_print_fixed(zpad(t[3]) + '/' + zpad(t[4]) + '/' + str(t[5]), 0, 0, 10)
-  ssd_print_fixed(zpad(t[0]) + ':' + zpad(t[1]), 0, 1, 5)
-  if should_log  log_sd(co2, temp, humi, t)  end
+  var rtc_ok = (t[5] >= 2024 && t[5] <= 2035)
+  if rtc_ok
+    ssd_print_fixed(zpad(t[3]) + '/' + zpad(t[4]) + '/' + str(t[5]), 0, 0, 10)
+    ssd_print_fixed(zpad(t[0]) + ':' + zpad(t[1]), 0, 1, 5)
+    if should_log  log_sd(co2, temp, humi, t)  end
+  else
+    ssd_print_fixed('Acerte o RTC!', 0, 0, 13)
+    ssd_print_fixed('--/--/----', 0, 1, 10)
+  end
   ssd_print_fixed('CO2:' + co2 + ' ppm', 0, 3, 15)
   ssd_print_fixed('T:' + temp + 'C H:' + humi + '%', 0, 5, 16)
   ssd_print_fixed(ip, 0, 7, 16)
@@ -258,9 +309,11 @@ end
 
 tasmota.set_timer(20000, def()
   setup_gpio()
+  setup_identity()
   sync_rtc()
   var t = read_rtc()
-  init_logfile(t)
+  var rtc_valid = (t[5] >= 2024 && t[5] <= 2035)
+  if rtc_valid  init_logfile(t)  end
   ssd_init()
   ssd_clear()
   tasmota.set_timer(1000, disp_loop)
