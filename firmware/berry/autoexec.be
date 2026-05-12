@@ -202,6 +202,18 @@ def log_sd(co2, temp, humi, t)
   LOGHANDLE.flush()
 end
 
+def check_sdcard()
+  try
+    var f = open('/sd/.check', 'w')
+    f.close()
+    return true
+  except .. as e, m
+    print('SDCard ausente: ' + str(e))
+    ssd_print_fixed('Insira o SDCard!', 0, 3, 16)
+    return false
+  end
+end
+
 # ── Configuração de GPIOs ─────────────────────────
 # Roda apenas uma vez — detecta se já está configurado
 
@@ -311,11 +323,11 @@ tasmota.set_timer(20000, def()
   setup_gpio()
   setup_identity()
   sync_rtc()
-  var t = read_rtc()
-  var rtc_valid = (t[5] >= 2024 && t[5] <= 2035)
-  if rtc_valid  init_logfile(t)  end
   ssd_init()
   ssd_clear()
+  var t = read_rtc()
+  var rtc_valid = (t[5] >= 2024 && t[5] <= 2035)
+  if rtc_valid && check_sdcard()  init_logfile(t)  end
   tasmota.set_timer(1000, disp_loop)
   tasmota.set_timer(70000, watchdog)
 end)
