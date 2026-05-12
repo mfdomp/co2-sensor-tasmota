@@ -14,6 +14,7 @@ var loop_count   = 0
 var last_count   = 0
 
 import json
+import os
 
 # ── Fonte 5x7 ASCII 32-126 ────────────────────────
 var FONT = bytes(
@@ -206,6 +207,7 @@ def check_sdcard()
   try
     var f = open('/sd/.check', 'w')
     f.close()
+    os.remove('/sd/.check')
     return true
   except .. as e, m
     print('SDCard ausente: ' + str(e))
