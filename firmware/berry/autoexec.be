@@ -154,10 +154,12 @@ end
 # Uso: calibrar_scd41(900)  # valor em ppm do ambiente de referência
 
 def calibrar_scd41(ppm)
-  wire1.write(0x62, 0x36, 0x03, 1)
-  tasmota.set_timer(3000, def()
-    var msb = (ppm + 32768) >> 8
-    var lsb = (ppm + 32768) & 0xFF
+  # Para medicao periodica: comando 0x3F86
+  wire1.write(0x62, 0x3F, 0x86, 1)
+  tasmota.set_timer(500, def()
+    var target = ppm + 32768
+    var msb = (target >> 8) & 0xFF
+    var lsb = target & 0xFF
     var crc = 0xFF
     crc = crc ^ msb
     for i: 0..7
@@ -169,11 +171,13 @@ def calibrar_scd41(ppm)
       if crc & 0x80  crc = (crc << 1) ^ 0x31  else  crc = crc << 1  end
       crc = crc & 0xFF
     end
-    wire1.write(0x62, 0x36, 0x27, 1)
-    tasmota.yield()
-    wire1.write(0x62, msb, lsb, 1)
-    wire1.write(0x62, crc, 0x00, 1)
-    print('Calibracao enviada: ' + str(ppm) + ' ppm')
+    # FRC 0x362F + payload numa unica transacao I2C (reg=0x36, val=0x2F|msb|lsb|crc, big-endian)
+    wire1.write(0x62, 0x36, (0x2F << 24) | (msb << 16) | (lsb << 8) | crc, 4)
+    tasmota.set_timer(400, def()
+      # Reinicia medicao periodica: comando 0x21B1
+      wire1.write(0x62, 0x21, 0xB1, 1)
+      print('Calibracao SCD41 concluida: ' + str(ppm) + ' ppm')
+    end)
   end)
 end
 
