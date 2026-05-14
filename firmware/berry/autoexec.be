@@ -176,7 +176,7 @@ def calibrar_scd41(ppm)
     tasmota.set_timer(400, def()
       # Reinicia medicao periodica: comando 0x21B1
       wire1.write(0x62, 0x21, 0xB1, 1)
-      print('Calibracao SCD41 concluida: ' + str(ppm) + ' ppm')
+      print('Calibracao SCD41 concluida: ' + str(target - 32768) + ' ppm')
     end)
   end)
 end
