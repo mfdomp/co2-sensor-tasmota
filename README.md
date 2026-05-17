@@ -48,6 +48,28 @@ co2-sensor-tasmota/
     └── pinout.md       # Tabela de pinos ESP32 ↔ periféricos
 ```
 
+## Acesso à Interface Web
+
+### Android (recomendado para uso em campo)
+1. Conecte ao WiFi `Sensor-XXXXXX`
+2. Quando aparecer "Esta rede não tem internet, deseja continuar?" — confirme **Sim**
+3. Abra o navegador e acesse `http://192.168.4.1`
+
+### Windows
+1. Conecte ao WiFi `Sensor-XXXXXX`
+2. Ignore o aviso "Ação necessária"
+3. Abra o navegador **manualmente** e acesse `http://192.168.4.1`
+4. **Atenção:** O Windows pode desconectar automaticamente redes sem internet. Se isso ocorrer, reconecte e acesse rapidamente.
+   - Para evitar: Configurações → Rede e Internet → WiFi → `Sensor-XXXXXX` → Propriedades → desabilitar troca automática de rede
+
+### iOS
+1. Conecte ao WiFi `Sensor-XXXXXX`
+2. Ignore o aviso de portal cativo
+3. Abra o Safari e acesse `http://192.168.4.1`
+
+### Endereço fixo
+O sensor sempre opera em `http://192.168.4.1` no modo AP.
+
 ## Início rápido
 
 1. **Grave o firmware Tasmota** no ESP32 — veja [`docs/setup.md`](docs/setup.md).
