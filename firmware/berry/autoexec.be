@@ -60,12 +60,22 @@ end
 def bcd(b) return (b>>4)*10+(b&0x0F) end
 def zpad(n) if n<10 return '0'+str(n) else return str(n) end end
 def read_rtc()
-  var sec=bcd(wire1.read(RTC,0x00,1)&0x7F)
-  var min=bcd(wire1.read(RTC,0x01,1))
-  var hour=bcd(wire1.read(RTC,0x02,1)&0x3F)
-  var date=bcd(wire1.read(RTC,0x04,1))
-  var mon=bcd(wire1.read(RTC,0x05,1)&0x1F)
-  var year=bcd(wire1.read(RTC,0x06,1))+2000
+  var s0=wire1.read(RTC,0x00,1)
+  var s1=wire1.read(RTC,0x01,1)
+  var s2=wire1.read(RTC,0x02,1)
+  var s4=wire1.read(RTC,0x04,1)
+  var s5=wire1.read(RTC,0x05,1)
+  var s6=wire1.read(RTC,0x06,1)
+  if s0==nil||s1==nil||s2==nil||s4==nil||s5==nil||s6==nil
+    print('RTC: leitura nil, retornando tempo invalido')
+    return [0,0,0,1,1,2000]
+  end
+  var sec=bcd(s0&0x7F)
+  var min=bcd(s1)
+  var hour=bcd(s2&0x3F)
+  var date=bcd(s4)
+  var mon=bcd(s5&0x1F)
+  var year=bcd(s6)+2000
   return [hour,min,sec,date,mon,year]
 end
 var LOGFILE=''
